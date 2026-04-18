@@ -24,7 +24,8 @@ services:
     ports:
       - "3000:80" # Mapping internal 80 (nginx) to 3000
     environment:
-      - VITE_API_URL=http://localhost:8000
+      - VITE_API_URL=
+      - VITE_BACKEND_URL=
     depends_on:
       - backend
 
@@ -37,9 +38,10 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      # Initialize DB with schema and seeds
+      # Initialize DB with schema, migrations, and seeds
       - ./database/schema.sql:/docker-entrypoint-initdb.d/1-schema.sql
-      - ./database/seed.sql:/docker-entrypoint-initdb.d/2-seed.sql
+      - ./database/migrations/001_rls_policies.sql:/docker-entrypoint-initdb.d/2-migrations.sql
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/3-seed.sql
       # Ephemeral storage for easy reset (comment out to persist)
       # - pgdata:/var/lib/postgresql/data
 

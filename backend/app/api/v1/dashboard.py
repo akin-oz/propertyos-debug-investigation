@@ -1,25 +1,38 @@
-from fastapi import APIRouter, Depends, HTTPException
-from typing import Dict, Any
+from decimal import Decimal, ROUND_HALF_UP
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from app.core.tenant_scope import TenantScope, require_tenant_scope
+from app.models.dashboard import DashboardSummaryResponse
+from app.models.identifiers import as_property_id
 from app.services.cache import get_revenue_summary
-from app.core.auth import authenticate_request as get_current_user
 
 router = APIRouter()
 
-@router.get("/dashboard/summary")
+
+@router.get(
+    "/dashboard/summary",
+    response_model=DashboardSummaryResponse,
+    responses={
+        401: {"description": "Missing or invalid authentication, or no tenant context"},
+        404: {"description": "Property not found or belongs to a different tenant"},
+        503: {"description": "Revenue service temporarily unavailable"},
+    },
+)
 async def get_dashboard_summary(
-    property_id: str,
-    current_user: dict = Depends(get_current_user)
-) -> Dict[str, Any]:
-    
-    tenant_id = getattr(current_user, "tenant_id", "default_tenant") or "default_tenant"
-    
-    revenue_data = await get_revenue_summary(property_id, tenant_id)
-    
-    total_revenue_float = float(revenue_data['total'])
-    
-    return {
-        "property_id": revenue_data['property_id'],
-        "total_revenue": total_revenue_float,
-        "currency": revenue_data['currency'],
-        "reservations_count": revenue_data['count']
-    }
+    scope: TenantScope = Depends(require_tenant_scope),
+    property_id: str = Query(..., description="Property identifier", min_length=1),
+) -> DashboardSummaryResponse:
+    pid = as_property_id(property_id)
+
+    revenue_data = await get_revenue_summary(pid, scope.tenant_id)
+    total_revenue = Decimal(revenue_data["total"]).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+
+    return DashboardSummaryResponse(
+        property_id=revenue_data["property_id"],
+        total_revenue=total_revenue,
+        currency=revenue_data["currency"],
+        reservations_count=revenue_data["count"],
+    )
