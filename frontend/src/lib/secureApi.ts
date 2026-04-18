@@ -12,6 +12,7 @@
 import { supabase } from './supabase';
 import { sessionManager } from '../utils/sessionManager';
 import { withRetry, handleApiError, classifyError } from '../utils/apiErrorHandler';
+import { logger } from './logger';
 
 // Get backend URL with fallback for misconfigured production environments
 const getBackendUrl = () => {
@@ -243,9 +244,7 @@ export class SecureAPIClient {
    * Validate tenant ID format for security
    */
   private isValidTenantId(tenantId: string): boolean {
-    // Check for UUID format (basic validation)
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    return typeof tenantId === 'string' && tenantId.length > 0 && uuidRegex.test(tenantId);
+    return typeof tenantId === 'string' && tenantId.length > 0;
   }
 
   /**
@@ -546,7 +545,7 @@ export class SecureAPIClient {
 
     // Log ALL API requests to track order
     const timestamp = new Date().toISOString();
-    console.log(`[API REQUEST] ${timestamp} - ${method} ${endpoint}`);
+    logger.debug(`${method} ${endpoint}`, { timestamp });
 
     // Create a tenant-isolated unique key for this request
     const tenantId = await this.getTenantId();
@@ -628,11 +627,10 @@ export class SecureAPIClient {
         const url = `${this.backendUrl}${endpoint}`;
 
 
-        // Only show attempt number if this is a retry
         if (attempt === 1) {
-          console.log(`🔒 Secure API Request: ${options.method || 'GET'} ${endpoint}`);
+          logger.debug(`${options.method || 'GET'} ${endpoint}`);
         } else {
-          console.log(`🔒 Secure API Request: ${options.method || 'GET'} ${endpoint} (retry ${attempt - 1}/${MAX_RETRIES - 1})`);
+          logger.debug(`${options.method || 'GET'} ${endpoint}`, { retry: attempt - 1, maxRetries: MAX_RETRIES - 1 });
         }
 
         const response = await fetch(url, {
@@ -1450,16 +1448,16 @@ export class SecureAPIClient {
 
   // ============= DASHBOARD API =============
   /**
-   * Get dashboard summary with optional simulation header
+   * Get dashboard summary with optional simulation header.
+   * Accepts PropertyId (branded) — callers must cast via asPropertyId() at
+   * the API response boundary, not from raw user input.
    */
-  async getDashboardSummary(propertyId: string, options?: { simulatedTenant?: string, timestamp?: number }) {
+  async getDashboardSummary(propertyId: import('../types/branded').PropertyId, options?: { simulatedTenant?: string }) {
     const queryParams = new URLSearchParams({ property_id: propertyId });
-    if (options?.timestamp) {
-      queryParams.append('_t', options.timestamp.toString());
-    }
 
     const requestOptions: RequestInit = {};
-    if (options?.simulatedTenant) {
+    // X-Simulated-Tenant is a dev-only debug header — never send in production
+    if (import.meta.env.DEV && options?.simulatedTenant) {
       requestOptions.headers = {
         'X-Simulated-Tenant': options.simulatedTenant
       };
