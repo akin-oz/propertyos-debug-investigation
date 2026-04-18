@@ -2,6 +2,7 @@
 Minimal tenant resolver for authentication.
 """
 from typing import Optional
+from fastapi import HTTPException
 import logging
 
 logger = logging.getLogger(__name__)
@@ -89,7 +90,7 @@ class TenantResolver:
             return "tenant-a"
             
         # Default fallback
-        return "tenant-a"
+        raise HTTPException(status_code=401, detail="No tenant context for user")
 
     @staticmethod
     async def update_user_tenant_metadata(user_id: str, tenant_id: str) -> None:

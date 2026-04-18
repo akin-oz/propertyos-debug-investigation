@@ -1,29 +1,34 @@
 import json
+from typing import Any, Dict
+
 import redis.asyncio as redis
-from typing import Dict, Any
 import os
 
-# Initialize Redis client (typically configured centrally).
-redis_client = redis.Redis.from_url(os.getenv("REDIS_URL", "redis://localhost:6379/0"))
+from ..models.identifiers import TenantId, PropertyId
+from ..core.cache_keys import revenue_cache_key
 
-async def get_revenue_summary(property_id: str, tenant_id: str) -> Dict[str, Any]:
+_redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+redis_client = redis.Redis.from_url(_redis_url, decode_responses=True)
+
+
+async def get_revenue_summary(property_id: PropertyId, tenant_id: TenantId) -> Dict[str, Any]:
     """
-    Fetches revenue summary, utilizing caching to improve performance.
+    Fetch revenue summary, with Redis caching.
+
+    Cache key is built by cache_keys.revenue_cache_key — never inline.
+    tenant_id is typed TenantId; mypy rejects passing a raw str here.
     """
-    cache_key = f"revenue:{property_id}"
-    
-    # Try to get from cache
+    cache_key = revenue_cache_key(tenant_id, property_id)
+
     cached = await redis_client.get(cache_key)
     if cached:
-        return json.loads(cached)
-    
-    # Revenue calculation is delegated to the reservation service.
-    from app.services.reservations import calculate_total_revenue
-    
-    # Calculate revenue
+        result_cached: Dict[str, Any] = json.loads(cached)
+        return result_cached
+
+    from .reservations import calculate_total_revenue
+
     result = await calculate_total_revenue(property_id, tenant_id)
-    
-    # Cache the result for 5 minutes
+
     await redis_client.setex(cache_key, 300, json.dumps(result))
-    
+
     return result
