@@ -209,7 +209,7 @@ class Settings(BaseSettings):
                 # If no loop is running, we can use asyncio.run
                 return asyncio.run(token_service.get_hostaway_token_for_city(city))
         except Exception as e:
-            print(f"ERROR: Failed to get token from Token Management: {str(e)}")
+            logger.error("Failed to get token from Token Management: %s", e)
 
             # Fallback to old method if Token Management fails
             tokens = self.get_hostaway_tokens()
@@ -218,16 +218,18 @@ class Settings(BaseSettings):
 
             token_key = f"HOSTAWAY_API_{city.upper()}"
 
-        print(
-            f"DEBUG: Looking for token key '{token_key}' in available keys: {list(tokens.keys())}"
+        logger.debug(
+            "Looking for token key '%s' in available keys: %s",
+            token_key,
+            list(tokens.keys()),
         )
 
         token = tokens.get(token_key)
         if token:
-            print(f"DEBUG: Found token for {city} (length: {len(token)})")
+            logger.debug("Found token for %s (length: %d)", city, len(token))
         else:
-            print(f"WARNING: No token found for city '{city}' with key '{token_key}'")
-            print(f"WARNING: Available token keys are: {list(tokens.keys())}")
+            logger.warning("No token found for city '%s' with key '%s'", city, token_key)
+            logger.warning("Available token keys are: %s", list(tokens.keys()))
 
         return token
 

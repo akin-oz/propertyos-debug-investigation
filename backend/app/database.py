@@ -343,29 +343,73 @@ try:
                         return MockResponse(user=u)
                 return MockResponse(user=None)
 
+        MOCK_PROPERTIES = [
+            {"id": "prop-001", "name": "Beach House Alpha",       "tenant_id": "tenant-a", "timezone": "Europe/Paris"},
+            {"id": "prop-002", "name": "City Apartment Downtown",  "tenant_id": "tenant-a", "timezone": "Europe/Paris"},
+            {"id": "prop-003", "name": "Country Villa Estate",     "tenant_id": "tenant-a", "timezone": "Europe/Paris"},
+            {"id": "prop-001", "name": "Mountain Lodge Beta",      "tenant_id": "tenant-b", "timezone": "America/New_York"},
+            {"id": "prop-004", "name": "Lakeside Cottage",         "tenant_id": "tenant-b", "timezone": "America/New_York"},
+            {"id": "prop-005", "name": "Urban Loft Modern",        "tenant_id": "tenant-b", "timezone": "America/New_York"},
+        ]
+
+        class ChallengeQueryBuilder:
+            """Fluent query builder that tracks table/filters and returns mock data on execute()."""
+
+            def __init__(self, table_name: str):
+                self._table = table_name
+                self._filters: list = []  # list of (col, op, val)
+                self._columns = "*"
+
+            def select(self, columns="*"):
+                self._columns = columns
+                return self
+
+            def eq(self, column, value):
+                self._filters.append((column, "eq", value))
+                return self
+
+            def in_(self, column, values):
+                self._filters.append((column, "in", values))
+                return self
+
+            def limit(self, *args):
+                return self
+
+            def __getattr__(self, name):
+                return lambda *args, **kwargs: self
+
+            def execute(self):
+                if self._table == "properties":
+                    data = list(MOCK_PROPERTIES)
+                    for col, op, val in self._filters:
+                        if op == "eq":
+                            data = [r for r in data if r.get(col) == val]
+                        elif op == "in":
+                            data = [r for r in data if r.get(col) in val]
+                    return MockResponse(data=data)
+                return MockResponse()
+
         class ChallengeClient:
             def __init__(self):
                 self.auth = ChallengeAuth()
                 self.service = self
 
             def __getattr__(self, name):
-                # Return self for chaining (e.g. table().select())
                 return lambda *args, **kwargs: self
-            
-            def table(self, *args):
-                 return self
-            
+
+            def table(self, table_name=""):
+                return ChallengeQueryBuilder(table_name)
+
             def select(self, *args):
                 return self
-            
+
             def eq(self, *args):
                 return self
-                
+
             def in_(self, *args):
                 return self
 
             def execute(self):
-                # Return empty data for DB queries
                 return MockResponse()
 
         _base_client = ChallengeClient()

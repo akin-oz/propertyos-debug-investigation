@@ -3,7 +3,7 @@ from typing import Dict, Any, List, Optional
 import logging
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from PIL import Image
 import io
 
@@ -67,7 +67,7 @@ async def get_profile(
         logger.info(f"User {user.email} is fetching their profile.")
         
         # Create default profile data in case tables don't exist or profile is missing
-        now_iso = datetime.utcnow().isoformat()
+        now_iso = datetime.now(timezone.utc).isoformat()
         # Build safe defaults matching the response models when DB rows are missing
         default_profile = {
             'id': f'synthetic-{user.id}',

@@ -1,7 +1,10 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Dict, Any
 from ...database import supabase
 from ...core.auth import authenticate_request, ADMIN_EMAILS
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -44,7 +47,7 @@ async def get_available_cities():
         }
         
     except Exception as e:
-        print(f"Error fetching cities: {e}")
+        logger.error("Error fetching cities: %s", e)
         raise HTTPException(status_code=500, detail="Failed to fetch cities")
 
 @router.get("/cities/user-accessible")
@@ -124,5 +127,5 @@ async def get_user_accessible_cities(
         }
         
     except Exception as e:
-        print(f"Error fetching user accessible cities: {e}")
+        logger.error("Error fetching user accessible cities: %s", e)
         raise HTTPException(status_code=500, detail="Failed to fetch accessible cities")

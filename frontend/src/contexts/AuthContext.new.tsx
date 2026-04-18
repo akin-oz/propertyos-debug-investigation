@@ -210,7 +210,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       try {
         if (session) {
-          console.log('🔍 [AuthContext] Session User Email:', session.user.email);
           const enrichedUser = enrichUserWithTenant(session);
           console.log('🔍 [AuthContext] Enriched User:', enrichedUser ? 'SUCCESS' : 'NULL');
           setUser(enrichedUser);
@@ -265,6 +264,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
+    // Auth-owned localStorage keys — remove these on logout instead of clear()
+    const AUTH_STORAGE_KEYS = [
+      'sidebarCollapsed',
+      'base360-auth-token',
+    ];
+    const clearAuthStorage = () => {
+      AUTH_STORAGE_KEYS.forEach(k => localStorage.removeItem(k));
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
+          localStorage.removeItem(key);
+        }
+      }
+      sessionStorage.clear();
+    };
     try {
       console.log('[AuthContext] Starting logout process');
 
@@ -272,10 +286,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       (window as any).__isLoggingOut = true;
       console.log('[AuthContext] Logout flag set - blocking all session recovery');
 
-      // 1. Clear storage IMMEDIATELY before anything else
-      localStorage.clear();
-      sessionStorage.clear();
-      console.log('[AuthContext] Storage cleared');
+      // 1. Clear only auth-owned storage keys — localStorage.clear() would nuke
+      //    unrelated app state for other tools on the same origin.
+      clearAuthStorage();
+      console.log('[AuthContext] Auth storage cleared');
 
       // 2. Stop session persistence manager
       sessionPersistenceManager.stop();
@@ -308,8 +322,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Even on error, ensure everything is cleared
       try {
-        localStorage.clear();
-        sessionStorage.clear();
+        clearAuthStorage();
         sessionPersistenceManager.stop();
         sessionRecovery.clearStoredSession();
         authOptimizer.clearSession();

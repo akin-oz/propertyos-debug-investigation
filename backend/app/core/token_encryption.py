@@ -12,7 +12,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import secrets
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class TokenEncryptionService:
@@ -247,7 +247,7 @@ class TokenEncryptionService:
         metadata = {
             'token_type': token_type,
             'purpose': purpose,
-            'created_at': datetime.utcnow().isoformat(),
+            'created_at': datetime.now(timezone.utc).isoformat(),
             'version': '1.0',
             'encryption_method': 'AES-256-GCM'
         }
@@ -285,7 +285,7 @@ class TokenCache:
         """
         if token_id in self._cache:
             token, timestamp = self._cache[token_id]
-            if (datetime.utcnow() - timestamp).total_seconds() < self.ttl_seconds:
+            if (datetime.now(timezone.utc) - timestamp).total_seconds() < self.ttl_seconds:
                 return token
             else:
                 # Remove expired token
@@ -300,7 +300,7 @@ class TokenCache:
             token_id: The token ID
             token: The decrypted token
         """
-        self._cache[token_id] = (token, datetime.utcnow())
+        self._cache[token_id] = (token, datetime.now(timezone.utc))
     
     def clear(self) -> None:
         """Clear all cached tokens"""

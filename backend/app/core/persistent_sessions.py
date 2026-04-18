@@ -17,7 +17,7 @@ import hashlib
 import json
 import secrets
 from typing import Optional, Dict, Any, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, Depends, status
 from fastapi.security import HTTPBearer
 from sqlalchemy import Column, String, DateTime, Boolean, Text, Index
@@ -123,7 +123,7 @@ class PersistentSessionManager:
         """Generate device fingerprint for additional security"""
         fingerprint_data = {
             'user_agent': user_agent or '',
-            'timestamp': datetime.utcnow().isoformat(),
+            'timestamp': datetime.now(timezone.utc).isoformat(),
         }
         fingerprint_string = json.dumps(fingerprint_data, sort_keys=True)
         return hashlib.sha256(fingerprint_string.encode()).hexdigest()
@@ -157,7 +157,7 @@ class PersistentSessionManager:
             )
             
             # Calculate expiration
-            expires_at = datetime.utcnow() + PersistentSessionManager.SESSION_DURATION
+            expires_at = datetime.now(timezone.utc) + PersistentSessionManager.SESSION_DURATION
             
             # Encrypt tokens for secure storage
             access_token_encrypted = PersistentSessionManager.encrypt_token(access_token)
@@ -173,8 +173,8 @@ class PersistentSessionManager:
                 # Store encrypted token data as JSON
                 'access_token_hash': json.dumps(access_token_encrypted),
                 'refresh_token_hash': json.dumps(refresh_token_encrypted) if refresh_token_encrypted else None,
-                'created_at': datetime.utcnow().isoformat(),
-                'last_activity': datetime.utcnow().isoformat(),
+                'created_at': datetime.now(timezone.utc).isoformat(),
+                'last_activity': datetime.now(timezone.utc).isoformat(),
                 'expires_at': expires_at.isoformat(),
                 'is_active': True,
                 'user_agent': user_agent,
@@ -235,7 +235,7 @@ class PersistentSessionManager:
             
             # Check expiration
             expires_at = datetime.fromisoformat(session['expires_at'].replace('Z', '+00:00'))
-            if datetime.utcnow() > expires_at:
+            if datetime.now(timezone.utc) > expires_at:
                 logger.warning(f"Session expired: {session_id}")
                 # Mark session as inactive
                 await PersistentSessionManager.deactivate_session(session_id)
@@ -278,7 +278,7 @@ class PersistentSessionManager:
         """Update session last activity timestamp"""
         try:
             result = supabase.service.table('persistent_sessions').update({
-                'last_activity': datetime.utcnow().isoformat()
+                'last_activity': datetime.now(timezone.utc).isoformat()
             }).eq('session_id', session_id).eq('is_active', True).execute()
             
             return len(result.data) > 0
@@ -300,7 +300,7 @@ class PersistentSessionManager:
             
             update_data = {
                 'access_token_hash': json.dumps(access_token_encrypted),
-                'last_activity': datetime.utcnow().isoformat()
+                'last_activity': datetime.now(timezone.utc).isoformat()
             }
             
             if new_refresh_token:
@@ -324,7 +324,7 @@ class PersistentSessionManager:
         try:
             result = supabase.service.table('persistent_sessions').update({
                 'is_active': False,
-                'last_activity': datetime.utcnow().isoformat()
+                'last_activity': datetime.now(timezone.utc).isoformat()
             }).eq('session_id', session_id).execute()
             
             logger.info(f"Session deactivated: {session_id}")
@@ -340,7 +340,7 @@ class PersistentSessionManager:
         try:
             query = supabase.service.table('persistent_sessions').update({
                 'is_active': False,
-                'last_activity': datetime.utcnow().isoformat()
+                'last_activity': datetime.now(timezone.utc).isoformat()
             }).eq('user_id', user_id).eq('is_active', True)
             
             if exclude_session_id:
@@ -391,7 +391,7 @@ class PersistentSessionManager:
     async def cleanup_expired_sessions() -> int:
         """Clean up all expired sessions (should be run periodically)"""
         try:
-            current_time = datetime.utcnow().isoformat()
+            current_time = datetime.now(timezone.utc).isoformat()
             
             # Get expired active sessions
             result = supabase.service.table('persistent_sessions').select(
@@ -478,7 +478,7 @@ async def get_or_create_persistent_session(
     return await PersistentSessionManager.create_session(
         user_id=user.id,
         tenant_id=user.tenant_id or '',
-        device_id=device_id or f"device_{user.id}_{datetime.utcnow().timestamp()}",
+        device_id=device_id or f"device_{user.id}_{datetime.now(timezone.utc).timestamp()}",
         access_token=access_token,
         user_agent=user_agent,
         ip_address=ip_address

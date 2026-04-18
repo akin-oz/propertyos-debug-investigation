@@ -15,6 +15,7 @@ import os
 import time
 
 from app.core.redis_client import redis_client
+from .core.tenant_context import set_user_token, clear_user_token, set_tenant_id, clear_tenant_id
 from .api.v1 import (
     users_lightning,
     cities,
@@ -29,6 +30,7 @@ from .api.v1 import (
     persistent_auth,
     dashboard,
     login,
+    properties,
 )
 
 from .monitoring.middleware import PerformanceMonitoringMiddleware
@@ -171,6 +173,52 @@ app.add_middleware(
 # Performance monitoring middleware
 app.add_middleware(PerformanceMonitoringMiddleware)
 
+# Token context middleware — must be added AFTER other middlewares so it runs
+# first (Starlette applies middleware in reverse registration order).
+# Sets the per-request ContextVars that _apply_auth() in database.py reads.
+#
+# We decode the JWT payload here WITHOUT verifying the signature — verification
+# still happens inside authenticate_request. We only need the claims (token +
+# tenant_id) so that every code path, including cache hits and endpoints that
+# don't use Depends(authenticate_request), finds a populated ContextVar.
+import base64 as _base64
+import json as _json
+
+def _extract_tenant_from_jwt(token: str) -> str | None:
+    """Return tenant_id from JWT payload without signature verification."""
+    try:
+        payload_b64 = token.split(".")[1]
+        # JWT uses URL-safe base64 without padding — restore it
+        padding = 4 - len(payload_b64) % 4
+        if padding != 4:
+            payload_b64 += "=" * padding
+        payload = _json.loads(_base64.urlsafe_b64decode(payload_b64))
+        return (
+            payload.get("app_metadata", {}).get("tenant_id")
+            or payload.get("tenant_id")
+        )
+    except Exception:
+        return None
+
+
+@app.middleware("http")
+async def token_context_middleware(request: Request, call_next):
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[len("Bearer "):]
+        set_user_token(token)
+        tenant_id = _extract_tenant_from_jwt(token)
+        if tenant_id:
+            set_tenant_id(tenant_id)
+    try:
+        response = await call_next(request)
+    finally:
+        # Always clean up — prevents state leaking to the next request on
+        # the same worker coroutine.
+        clear_user_token()
+        clear_tenant_id()
+    return response
+
 # Include API routers - Auth & User Management Only
 # Authentication
 app.include_router(login.router, prefix="/api/v1", tags=["auth"])
@@ -183,6 +231,7 @@ app.include_router(profile.router, prefix="/api/v1", tags=["profile"])
 
 # Dashboard
 app.include_router(dashboard.router, prefix="/api/v1", tags=["dashboard"])
+app.include_router(properties.router, prefix="/api/v1", tags=["properties"])
 
 # Bootstrap & Settings (for AppContext)
 app.include_router(company_settings.router, prefix="/api/v1", tags=["company-settings"])

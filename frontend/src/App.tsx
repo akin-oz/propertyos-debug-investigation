@@ -69,25 +69,50 @@ export const useSidebar = () => {
   return context;
 };
 
-// Configure QueryClient with persistent caching
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      gcTime: 1000 * 60 * 60 * 24, // 24 hours
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      refetchOnWindowFocus: true,
-      refetchOnMount: true,
-      retry: 1,
-    },
-  },
-});
-
 // Create persister using localforage (IndexedDB)
 const persister = createSyncStoragePersister({
   storage: localforage as any,
 });
 
+// Read tenant ID at app init to bust the React Query persisted cache on tenant switch.
+// If a different tenant logs in, the buster changes and all persisted cache is ignored.
+// This prevents cross-tenant data leaking via IndexedDB on shared machines.
+const getPersistedCacheBuster = (): string => {
+  try {
+    // AuthContext stores the token in Supabase's localStorage key
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i) || '';
+      if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+        const raw = localStorage.getItem(key);
+        if (!raw) continue;
+        const parsed = JSON.parse(raw);
+        const token = parsed?.access_token || parsed?.currentSession?.access_token;
+        if (token && token.includes('.')) {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          const tenantId = payload?.user_metadata?.tenant_id || payload?.app_metadata?.tenant_id || payload?.tenant_id;
+          if (tenantId) return tenantId;
+        }
+      }
+    }
+  } catch { }
+  return '';
+};
+
 function AppWrapper() {
+  // QueryClient scoped to the component tree — not module-level — so it resets
+  // correctly on HMR reloads and in test environments.
+  const [queryClient] = useState(() => new QueryClient({
+    defaultOptions: {
+      queries: {
+        gcTime: 1000 * 60 * 60 * 24, // 24 hours
+        staleTime: 1000 * 60 * 5, // 5 minutes
+        refetchOnWindowFocus: true,
+        refetchOnMount: true,
+        retry: 1,
+      },
+    },
+  }));
+
   // Initialize localStorage manager on app startup
   useEffect(() => {
     try {
@@ -125,7 +150,7 @@ function AppWrapper() {
                   persistOptions={{
                     persister,
                     maxAge: 1000 * 60 * 60 * 24,
-                    buster: "",
+                    buster: getPersistedCacheBuster(),
                   }}
                 >
                   <AppContent />

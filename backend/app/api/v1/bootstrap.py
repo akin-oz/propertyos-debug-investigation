@@ -6,7 +6,7 @@ Implements aggressive caching for near-instant response times.
 
 from fastapi import APIRouter, Depends, HTTPException
 from typing import Optional, Dict, Any, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 import time
 import json
@@ -467,7 +467,7 @@ async def bootstrap_app(
         'subsections': subsections,
         'metadata': {
             'tenant_id': tenant_id,
-            'timestamp': datetime.utcnow().isoformat(),
+            'timestamp': datetime.now(timezone.utc).isoformat(),
             'version': '1.0.0'
         },
         'cache_info': {

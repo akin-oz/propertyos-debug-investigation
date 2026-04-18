@@ -2,7 +2,7 @@ from fastapi import HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 import hashlib
 import asyncio
@@ -60,6 +60,7 @@ ADMIN_EMAILS = [
     "michael@theflexliving.com",
     "younes@gmail.com",
     "yazid@theflexliving.com",
+    "candidate@propertyflow.com",  # challenge test account
 ]
 
 

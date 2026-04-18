@@ -6,7 +6,7 @@ from ...core.tenant_resolver import TenantResolver
 from ...models.auth import Permission
 import logging
 import hashlib
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import jwt
 from ...config import settings
 
@@ -50,8 +50,8 @@ async def login(request: LoginRequest):
                 "app_metadata": {"role": "user", "tenant_id": "tenant-a"},
                 "user_metadata": {"name": "Sunset Properties Manager"},
                 "aud": "authenticated",
-                "created_at": datetime.utcnow().isoformat(),
-                "exp": datetime.utcnow() + timedelta(hours=24)
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "exp": datetime.now(timezone.utc) + timedelta(hours=24)
             }
             
             token = jwt.encode(user_data, settings.secret_key, algorithm="HS256")
@@ -80,8 +80,8 @@ async def login(request: LoginRequest):
                 "app_metadata": {"role": "user", "tenant_id": "tenant-b"},
                 "user_metadata": {"name": "Ocean Rentals Manager"},
                 "aud": "authenticated",
-                "created_at": datetime.utcnow().isoformat(),
-                "exp": datetime.utcnow() + timedelta(hours=24)
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "exp": datetime.now(timezone.utc) + timedelta(hours=24)
             }
             
             token = jwt.encode(user_data, settings.secret_key, algorithm="HS256")
@@ -152,7 +152,7 @@ async def login(request: LoginRequest):
                 "email": user.email,
                 "is_admin": is_admin,
                 "tenant_id": tenant_id,
-                "exp": datetime.utcnow() + timedelta(hours=24),
+                "exp": datetime.now(timezone.utc) + timedelta(hours=24),
                 "aud": "authenticated"
             }
             
