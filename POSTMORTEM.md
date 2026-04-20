@@ -80,7 +80,7 @@ Backend: `Decimal(value).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)` — 
 ## PM-4: Every API Call Returned an HTML Page
 **Date:** 2026-04-18 | **Severity:** P0 — Total Deployment Failure
 
-> *"When the application is deployed via Docker, every API call returns an HTML page instead of data — making the entire product appear broken while the development environment continues to work normally."*
+> *"When a client opens the app for the first time outside a developer's laptop, every page that loads data shows an error — profile, revenue, properties — because the server is returning a blank page instead of responding to any API call. The app looks broken. It is broken. The developer's machine works fine."*
 
 **Impact**
 The app loads. The UI renders. And then nothing works. Profile page: blank. Revenue summary: blank. Every network call in the browser returns `<!DOCTYPE html>`. The backend shows no errors because no request ever reaches it. The developer runs the same app with `npm run dev` and everything works perfectly. The Docker deployment — the one that mirrors production, the one that matters — is completely broken. The gap between dev and Docker is invisible until the moment it isn't, which is usually a demo, a deploy, or a client onboarding call.
