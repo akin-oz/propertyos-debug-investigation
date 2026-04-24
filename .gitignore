@@ -5,7 +5,9 @@ node_modules/
 
 # Build output
 dist/
+frontend/dist/
 build/
+vite.config.ts.timestamp-*
 *.egg-info/
 __pycache__/
 *.py[cod]

@@ -146,12 +146,6 @@ would close the *class* of bug — what I'd prioritise with another week:
   and has no `__float__` — makes `float(revenue)` impossible to write, not
   just discouraged (see PM-3).
 
-## Walkthrough
-
-5-minute Loom walking through Bug 1 end-to-end (the complaint, the cache
-key inspection, the fix, the regression test that blocks recurrence):
-**[LOOM_URL_TBD]**
-
 ## Running it
 
 ```bash
